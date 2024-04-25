@@ -1,6 +1,6 @@
 # README
 An unofficial implement of _FSPEN: AN ULTRA-LIGHTWEIGHT NETWORK FOR 
-REAL TIME SPEECH ENAHNCMENT_[1].
+REAL TIME SPEECH ENAHNCMENT_ [1].
 
 Note that there are lots of mistakes in the original paper, like the parameters setting.
 
