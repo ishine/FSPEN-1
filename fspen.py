@@ -1,6 +1,5 @@
 """
 FSPEN: sub-band encoder + full-band encoder + DPE + sub-band decoder + full-band decoder
-Ultra tiny, 39.63 MMACs, 23.67 K params
 """
 import torch
 import numpy as np
