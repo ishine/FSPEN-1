@@ -4,7 +4,6 @@ FSPEN: sub-band encoder + full-band encoder + DPE + sub-band decoder + full-band
 import torch
 import numpy as np
 import torch.nn as nn
-from einops import rearrange
 from fspen_modules.encoder import FullBandEncoder, SubBandEncoder
 from fspen_modules.decoder import FullBandDecoder, SubBandDecoder
 from fspen_modules.feature import SubBandSplit, FeatureSplit, FeatureMerge, Mask
@@ -74,7 +73,7 @@ if __name__ == "__main__":
 
     wav, sr = sf.read('./test.wav')
     wav = torch.from_numpy(wav).float()
-    noisy = torch.stft(wav[80000: 160000], 512, 256, 512, torch.hann_window(512).pow(0.5), return_complex=True)
+    noisy = torch.stft(wav, 512, 256, 512, torch.hann_window(512).pow(0.5), return_complex=True)
     noisy = torch.view_as_real(noisy)
     noisy = noisy.unsqueeze(0)
     noisy = noisy.permute(0, 3, 2, 1)
