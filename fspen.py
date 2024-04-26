@@ -11,16 +11,18 @@ from fspen_modules.dpe import DPE
 
 
 class FSPEN(nn.Module):
-    def __init__(self):
+    def __init__(self, groups):
         super(FSPEN, self).__init__()
+        self.groups = groups
+
         self.sb_split = SubBandSplit()
         self.fb_encoder = FullBandEncoder()
         self.sb_encoder = SubBandEncoder()
         self.fm = FeatureMerge()
 
-        self.dpe1 = DPE(16, 32, 16)
-        self.dpe2 = DPE(16, 32, 16)
-        self.dpe3 = DPE(16, 32, 16)
+        self.dpe1 = DPE(16, 32, 16, self.groups)
+        self.dpe2 = DPE(16, 32, 16, self.groups)
+        self.dpe3 = DPE(16, 32, 16, self.groups)
 
         self.fs = FeatureSplit()
         self.fb_decoder = FullBandDecoder()
@@ -31,23 +33,30 @@ class FSPEN(nn.Module):
         self.mask = Mask()
 
     def forward(self, spec):
-        spec_ref = spec  # [16, 2, F, T]
         amp = torch.abs(spec)
-        fb_feat, fb_en_outs = self.fb_encoder(spec)  # [B, 32, T, 16]
-
+        spec = torch.view_as_real(spec)
+        spec = spec.permute(0, 3, 2, 1).contiguous()
+        print("model input", spec.shape)
+        spec_ref = spec
+        amp = amp.permute(0, 2, 1).contiguous()
+        amp = amp.unsqueeze(1)
+        fb_feat, fb_en_outs = self.fb_encoder(spec)
         sb_feat = self.sb_split(amp)
         sb_feat, sb_en_outs = self.sb_encoder(sb_feat)
+        feat = self.fm(fb_feat, sb_feat)
 
-        feat = self.fm(fb_feat, sb_feat)  # [B, C, T, F_c]
-        feat = self.dpe1(feat)
-        feat = self.dpe2(feat)
-        feat = self.dpe3(feat)
-        feat = self.fs(feat)  # [B, T, F, C]
+        B, C, T, F_c = feat.shape
+
+        hidden_state = torch.zeros(self.groups, 1, B * F_c, 16, device=feat.device)
+        feat, hidden_state = self.dpe1(feat, hidden_state)
+        feat, hidden_state = self.dpe2(feat, hidden_state)
+        feat, hidden_state = self.dpe3(feat, hidden_state)
+        del hidden_state
+        feat = self.fs(feat)
         C = feat.shape[-1]
-        fb_feat, sb_feat = feat[..., 0: C // 2], feat[..., C // 2:]  # [B, C, T, F]
+        fb_feat, sb_feat = feat[..., :C // 2], feat[..., C // 2:]
 
         fb_mask = self.fb_decoder(fb_feat, fb_en_outs)
-
         sb_mask = self.sb_decoder(sb_feat, sb_en_outs)
         sb_mask = self.mask_padding(sb_mask)
 
@@ -57,35 +66,18 @@ class FSPEN(nn.Module):
 
 
 if __name__ == "__main__":
-    from ptflops import get_model_complexity_info
+    from thop import profile, clever_format
     import soundfile as sf
 
-    x = torch.randn(8, 2, 251, 257)
+    x = torch.randn(3, 16000)
+    spec = torch.stft(x, 512, 256, 512, torch.hann_window(512).pow(0.5), return_complex=True)
     print(x.shape)
-    print("========")
-    model = FSPEN().eval()
-    y = model(x)
-    print(y.shape)
+    model = FSPEN(groups=8).eval()
+    y = model(spec)
+    print("output", y.shape)
 
-    flops, params = get_model_complexity_info(model, (2, 63, 257), as_strings=True,
-                                              print_per_layer_stat=False, verbose=True)
-    print(flops, params)
+    flops, params = profile(model, inputs=(spec,))
+    flops, params = clever_format(nums=[flops, params], format="%0.4f")
+    print(f"flops: {flops} \nparams: {params}")
 
-    wav, sr = sf.read('./test.wav')
-    wav = torch.from_numpy(wav).float()
-    noisy = torch.stft(wav, 512, 256, 512, torch.hann_window(512).pow(0.5), return_complex=True)
-    noisy = torch.view_as_real(noisy)
-    noisy = noisy.unsqueeze(0)
-    noisy = noisy.permute(0, 3, 2, 1)
-    print(noisy.shape)
-    enhanced = model(noisy)
-    print("enhanced ", enhanced.shape)
-    enhanced = enhanced.permute(0, 3, 2, 1)
-    print(enhanced.shape)
-    enhanced_r = enhanced[..., 0].float()
-    enhanced_i = enhanced[..., 1].float()
-    enhanced = torch.complex(enhanced_r, enhanced_i)
-    print(enhanced.shape)
 
-    enhanced = torch.istft(enhanced, 512, 256, 512, torch.hann_window(512).pow(0.5), return_complex=False)
-    sf.write("out.wav", enhanced.detach().cpu().numpy()[0], samplerate=16000)

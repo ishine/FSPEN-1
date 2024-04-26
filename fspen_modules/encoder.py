@@ -1,6 +1,8 @@
 import torch
 import torch.nn as nn
 
+"""Full Band Encoder"""
+
 
 class FullBandEncoder(nn.Module):
     def __init__(self):
@@ -20,26 +22,6 @@ class FullBandEncoder(nn.Module):
         return x, en_outs[0: 3]
 
 
-class SubBandEncoder(nn.Module):
-    def __init__(self):
-        super().__init__()
-        self.sub_en_convs = nn.ModuleList([
-            SubBandConvBlock(2, 32, kernel_size=(1, 4), stride=(1, 2), padding=(0, 1)),
-            SubBandConvBlock(2, 32, kernel_size=(1, 7), stride=(1, 3), padding=(0, 3)),
-            SubBandConvBlock(2, 32, kernel_size=(1, 11), stride=(1, 5), padding=(0, 2)),
-            SubBandConvBlock(2, 32, kernel_size=(1, 20), stride=(1, 10), padding=(0, 4)),
-            SubBandConvBlock(2, 32, kernel_size=(1, 40), stride=(1, 20), padding=(0, 7))
-        ])
-
-    def forward(self, x):
-        en_outs = []
-        for i in range(len(self.sub_en_convs)):
-            en_outs_i = self.sub_en_convs[i](x[i])
-            en_outs.append(en_outs_i)
-        output = torch.concat(en_outs, dim=-1)
-        return output, en_outs
-
-
 class FullBandConvBlock(nn.Module):
     def __init__(self, in_channels, out_channels, kernel_size, stride, padding, use_deconv):
         super().__init__()
@@ -50,6 +32,29 @@ class FullBandConvBlock(nn.Module):
 
     def forward(self, x):
         return self.act(self.bn(self.conv(x)))
+
+
+"""Sub Band Encoder"""
+
+
+class SubBandEncoder(nn.Module):
+    def __init__(self):
+        super().__init__()
+        self.sub_en_convs = nn.ModuleList([
+            SubBandConvBlock(1, 32, kernel_size=(1, 4), stride=(1, 2), padding=(0, 1)),
+            SubBandConvBlock(1, 32, kernel_size=(1, 7), stride=(1, 3), padding=(0, 3)),
+            SubBandConvBlock(1, 32, kernel_size=(1, 11), stride=(1, 5), padding=(0, 2)),
+            SubBandConvBlock(1, 32, kernel_size=(1, 20), stride=(1, 10), padding=(0, 4)),
+            SubBandConvBlock(1, 32, kernel_size=(1, 40), stride=(1, 20), padding=(0, 7))
+        ])
+
+    def forward(self, x):
+        en_outs = []
+        for i in range(len(self.sub_en_convs)):
+            en_outs_i = self.sub_en_convs[i](x[i])
+            en_outs.append(en_outs_i)
+        output = torch.concat(en_outs, dim=-1)
+        return output, en_outs
 
 
 class SubBandConvBlock(nn.Module):
