@@ -44,7 +44,7 @@ class SubBandDecoder(nn.Module):
             SubBandDecBlock(64, 20)
         ])
 
-    def forward(self, x, sb_res_list):  # x: [8, 32, 251, 16]
+    def forward(self, x, sb_res_list):
         n = len(self.sb_dec_lists)
         idx_list = [0, 8, 14, 20, 26, 32]
         y = []
@@ -75,7 +75,7 @@ class SubBandDecBlock(nn.Module):
 
     def forward(self, x, sb_res):
         feat = torch.cat([x, sb_res], dim=1)
-        feat = feat.permute(0, 3, 2, 1).contiguous()  # :-> [B, F_c, T, C]
+        feat = feat.permute(0, 3, 2, 1).contiguous()
         B, F, T, C = feat.shape
         feat = torch.reshape(feat, shape=(B * F, T, C))
         feat = self.act(self.fc(feat))

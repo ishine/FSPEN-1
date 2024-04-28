@@ -32,10 +32,12 @@ class FeatureMerge(nn.Module):
         self.act = nn.ELU()
 
     def forward(self, fb_feat, sb_feat):
-        feat = torch.concat((fb_feat, sb_feat), dim=-1)
-        feat = self.fc(feat)
+        feat = torch.concat((fb_feat, sb_feat), dim=1)  # [B, 2F, T, C]
+        feat = feat.permute(0, 2, 3, 1).contiguous()  # [B, T, C, 2F]
+        feat = self.fc(feat)  # -> [B, T, C, F]
         feat = self.act(feat)
-        feat = self.conv(feat)  # [B, C, T, F_c]
+        feat = feat.permute(0, 2, 1, 3).contiguous()  # -> [B, C, T, F]
+        feat = self.conv(feat)  # -> [B, C//2, T, F]
         return feat
 
 
@@ -48,11 +50,10 @@ class FeatureSplit(nn.Module):
 
     def forward(self, x):
         feat = self.conv(x)
-        # feat = feat.permute(0, 3, 1, 2).contiguous()
         B, C, T, F = feat.shape
         feat = torch.reshape(feat, shape=(B * C, T, F))
         feat = self.act(self.fc(feat))
-        feat = torch.reshape(feat, shape=(B, F, T, F * 2))
+        feat = torch.reshape(feat, shape=(B, C, T, F * 2))
         return feat
 
 
