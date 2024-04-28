@@ -1,3 +1,8 @@
+"""
+This part was completed based on the contributions of Xiao-bin Rong (https://github.com/Xiaobin-Rong)
+Many thanks to him for his contributions!
+"""
+
 import torch
 import torch.nn as nn
 
