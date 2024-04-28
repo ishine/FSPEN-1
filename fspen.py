@@ -36,7 +36,6 @@ class FSPEN(nn.Module):
         amp = torch.abs(spec)
         spec = torch.view_as_real(spec)
         spec = spec.permute(0, 3, 2, 1).contiguous()
-        print("model input", spec.shape)
         spec_ref = spec
         amp = amp.permute(0, 2, 1).contiguous()
         amp = amp.unsqueeze(1)
@@ -47,7 +46,7 @@ class FSPEN(nn.Module):
 
         B, C, T, F_c = feat.shape
 
-        hidden_state = torch.zeros(self.groups, 1, B * F_c, 16, device=feat.device)
+        hidden_state = torch.zeros(self.groups, 1, B * F_c // self.groups, 16, device=feat.device)
         feat, hidden_state = self.dpe1(feat, hidden_state)
         feat, hidden_state = self.dpe2(feat, hidden_state)
         feat, hidden_state = self.dpe3(feat, hidden_state)
@@ -69,7 +68,7 @@ if __name__ == "__main__":
     from thop import profile, clever_format
     import soundfile as sf
 
-    x = torch.randn(3, 16000)
+    x = torch.randn(1, 16000)
     spec = torch.stft(x, 512, 256, 512, torch.hann_window(512).pow(0.5), return_complex=True)
     print(x.shape)
     model = FSPEN(groups=8).eval()
@@ -79,5 +78,3 @@ if __name__ == "__main__":
     flops, params = profile(model, inputs=(spec,))
     flops, params = clever_format(nums=[flops, params], format="%0.4f")
     print(f"flops: {flops} \nparams: {params}")
-
-
